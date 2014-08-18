@@ -1,0 +1,12 @@
+body{
+	background:white;
+}
+#flipbook{
+	width:1152px;
+	height:752px;
+}
+
+#flipbook .turn-page{
+	background-color:white;
+	background-size:100% 100%;
+}
