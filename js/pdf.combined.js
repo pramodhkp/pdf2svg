@@ -22,8 +22,8 @@ if (typeof PDFJS === 'undefined') {
   (typeof window !== 'undefined' ? window : this).PDFJS = {};
 }
 
-PDFJS.version = '1.0.693';
-PDFJS.build = '977e400';
+PDFJS.version = '1.0.730';
+PDFJS.build = '8dd618b';
 
 (function pdfjsWrapper() {
   // Use strict in our context only - users might not want it
@@ -1699,13 +1699,6 @@ PDFJS.useOnlyCssZoom = (PDFJS.useOnlyCssZoom === undefined ?
                         false : PDFJS.useOnlyCssZoom);
 
 /**
- * Enables SVG rendering.
- * @var {boolean}
- */
-PDFJS.svgRendering = (PDFJS.svgRendering === undefined ?
-                      false : PDFJS.svgRendering);
-
-/**
  * Controls the logging level.
  * The constants from PDFJS.VERBOSITY_LEVELS should be used:
  * - errors
@@ -2118,6 +2111,7 @@ var PDFPageProxy = (function PDFPageProxyClosure() {
       var self = this;
       intentState.displayReadyCapability.promise.then(
         function pageDisplayReadyPromise(transparency) {
+          console.log(intentState.operatorList);
           if (self.pendingDestroy) {
             complete();
             return;
@@ -2257,6 +2251,7 @@ var PDFPageProxy = (function PDFPageProxyClosure() {
         intentState.operatorList.argsArray.push(
           operatorListChunk.argsArray[i]);
       }
+
       intentState.operatorList.lastChunk = operatorListChunk.lastChunk;
 
       // Notify all the rendering tasks there are more operators to be consumed.
@@ -2653,9 +2648,7 @@ var WorkerTransport = (function WorkerTransportClosure() {
           }
         }
         this.commonObjs.clear();
-        if (!PDFJS.svgRendering) { // HACK we might have SVGs using fonts
-          FontLoader.clear();
-        }
+        FontLoader.clear();
       }.bind(this));
     }
   };
@@ -6680,6 +6673,7 @@ var SVGExtraState = (function SVGExtraStateClosure() {
     this.charSpacing = 0;
     this.wordSpacing = 0;
     this.textHScale = 1;
+    this.textRenderingMode = TextRenderingMode.FILL;
     this.textRise = 0;
 
     // Default foreground and background colors
@@ -6917,6 +6911,7 @@ var SVGGraphics = (function SVGGraphicsClosure() {
         var fnId = fnArray[x];
         opList.push({'fnId' : fnId, 'fn': REVOPS[fnId], 'args': argsArray[x]});
       }
+
       return opListToTree(opList);
     },
     
@@ -7021,6 +7016,12 @@ var SVGGraphics = (function SVGGraphicsClosure() {
             break;
           case OPS.paintImageMaskXObject:
             this.paintImageMaskXObject(args[0]);
+            break;
+          case OPS.paintFormXObjectBegin:
+            this.paintFormXObjectBegin(args[0], args[1]);
+            break;
+          case OPS.paintFormXObjectEnd:
+            this.paintFormXObjectEnd();
             break;
           case OPS.closePath:
             this.closePath();
@@ -7233,6 +7234,7 @@ var SVGGraphics = (function SVGGraphicsClosure() {
 
     endText: function SVGGraphics_endText() {
       if (this.current.pendingClip) {
+        this.cgrp.appendChild(this.tgrp);
         this.pgrp.appendChild(this.cgrp);
       } else {
         this.pgrp.appendChild(this.tgrp);
@@ -7587,6 +7589,35 @@ var SVGGraphics = (function SVGGraphicsClosure() {
 
       this.paintInlineImageXObject(imgData, mask);
     },
+
+    paintFormXObjectBegin:
+        function SVGGraphics_paintFormXObjectBegin(matrix, bbox) {
+      this.save();
+
+      if (isArray(matrix) && matrix.length === 6) {
+        this.transform(matrix[0], matrix[1], matrix[2],
+                       matrix[3], matrix[4], matrix[5]);
+      }
+
+      if (isArray(bbox) && bbox.length === 4) {
+        var width = bbox[2] - bbox[0];
+        var height = bbox[3] - bbox[1];
+
+        var cliprect = document.createElementNS(NS, 'svg:rect');
+        cliprect.setAttributeNS(null, 'x', bbox[0]);
+        cliprect.setAttributeNS(null, 'y', bbox[1]);
+        cliprect.setAttributeNS(null, 'width', pf(width));
+        cliprect.setAttributeNS(null, 'height', pf(height));
+        this.current.element = cliprect;
+        this.clip('nonzero');
+        this.endPath();
+      }
+    },
+
+    paintFormXObjectEnd:
+        function SVGGraphics_paintFormXObjectEnd() {
+      this.restore();
+    }
   };
   return SVGGraphics;
 })();
