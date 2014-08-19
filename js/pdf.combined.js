@@ -17,6 +17,8 @@
 /*jshint globalstrict: false */
 /* globals PDFJS */
 
+var Canvas = require("canvas");
+Image = Canvas.Image;
 // Initializing PDFJS global object (if still undefined)
 if (typeof PDFJS === 'undefined') {
   (typeof window !== 'undefined' ? window : this).PDFJS = {};
